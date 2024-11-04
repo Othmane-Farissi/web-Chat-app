@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 const ChatPage: React.FC = () => {
   const [message, setMessage] = useState<string>("");
   const [messages, setMessages] = useState<string[]>([]);
+  const [typing, setTyping] = useState<string | null>(null);
   const [socket, setSocket] = useState<WebSocket | null>(null);
 
   useEffect(() => {
@@ -12,7 +13,14 @@ const ChatPage: React.FC = () => {
     setSocket(ws);
 
     ws.onmessage = (event: MessageEvent) => {
-      setMessages((prevMessages) => [...prevMessages, event.data]);
+      const data = JSON.parse(event.data);
+
+      if (data.type === "typing") {
+        setTyping(`${data.username} is typing...`);
+        setTimeout(() => setTyping(null), 2000);
+      } else {
+        setMessages((prevMessages) => [...prevMessages, data.message]);
+      }
     };
 
     return () => {
@@ -20,9 +28,15 @@ const ChatPage: React.FC = () => {
     };
   }, []);
 
+  const handleTyping = () => {
+    if (socket) {
+      socket.send(JSON.stringify({ type: "typing", username: "YourUsername" }));
+    }
+  };
+
   const sendMessage = () => {
     if (message.trim() && socket) {
-      socket.send(message);
+      socket.send(JSON.stringify({ type: "message", message }));
       setMessage("");
     }
   };
@@ -36,11 +50,13 @@ const ChatPage: React.FC = () => {
               {msg}
             </div>
           ))}
+          {typing && <div className="italic text-gray-500">{typing}</div>}
         </div>
         <input
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          onKeyPress={handleTyping}
           placeholder="Type a message..."
           className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 text-black mb-2"
         />
